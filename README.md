@@ -1,8 +1,12 @@
-> This is terribly incomplete
+> This is terribly incomplete for now
 >
-> However following is already useful:
-> - `./llzipdump ZIP >/dev/null; echo $?`
+> However following is already useful on JARs and APKs:
+>
+> - `./llzipdump ZIP >/dev/null; echo $?` and if this returns 1 then
 > - `./llzipdump ZIP | less '+/ Garbage$'`
+>
+> If you see something like `APK Sig Block 42` on the end of the Garbage,
+> have a look at https://source.android.com/security/apksigning
 
 # llzipdump
 
@@ -35,14 +39,26 @@ Please note that this then would wipe the APK signature,
 see https://source.android.com/security/apksigning
 
 
-## TODO
+## TODO/BUGs
 
-- CRC32 is not checked.  So currently you need other tools for this.
+- This is terribly incomplete (see `NOTYET` in the source)
+
+- Probably does not work for ZIP64 archives
+
+- Probably does not work for progressive archives (which cannot seek)
+
+- Probably does not work for split ZIP files
+
+- Fails on encrypted archives (does not grok encryption records yet)
+
+- CRC32 is not checked.  So currently you need other tools for this
 
 - Add more ZIP variants.  If you find one which is not processed correctly,
   pease open an issue on GH and do not forget to add a link to the ZIP file!
   (Without a sample ZIP I certainly cannot fix it.)
 
+- The central directory is not compared with the file entries.
+  In fact this program just dumps things and does not interpret them.
 
 ## FAQ
 
