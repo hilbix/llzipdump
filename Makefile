@@ -17,7 +17,7 @@ install:	$(PROG)
 
 .PHONY:	debug
 debug:	all
-	/usr/bin/gdb -q -nx -nw -ex r --args '$(PROG)' 1.zip
+	/usr/bin/gdb -q -nx -nw -ex r --args '$(PROG)' -- *.zip
 
 .PHONY:	clean
 clean:
