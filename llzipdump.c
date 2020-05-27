@@ -761,7 +761,9 @@ usage(const char *arg0)
   if (tmp)
     arg0	= tmp+1;
   fprintf(stderr, "# Usage: %s -- files..\n\toutput (possibly hidden) information about the given ZIP files\n", arg0);
+#if 0
   fprintf(stderr, "# Usage: %s -N files.. > part\n\textract the Nth part (0 is what starts the file)\n", arg0);
+#endif
   return 42;
 }
 
