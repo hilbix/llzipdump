@@ -24,6 +24,9 @@ enum zipartype
     ZIP_EXTRA,
     ZIP_DATA,
     ZIP_DESC,
+    ZIP_DIR,
+    ZIP_COMMENT,
+    ZIP_END,
   };
 
 static const char *zipartypes[] =
@@ -34,6 +37,9 @@ static const char *zipartypes[] =
   , "File Extra"
   , "File Data"
   , "File Descriptor"
+  , "Dir Entry"
+  , "File Comment"
+  , "ZIP End"
   };
 
 typedef struct zipart
@@ -412,6 +418,7 @@ zipgarbage(ZIP, int nr)
 {
   zipart(Z, ZIP_GARBAGE);
   Z->current->gather	= 1;
+  Z->dirt		= 1;
   zipok(Z, nr);
 }
 
@@ -487,6 +494,8 @@ zipskip(ZIP, enum zipartype type, Zoff len)
 static void
 ziphex(ZIP, enum zipartype type, Zoff n)
 {
+  if (!n)
+    return;
   if (!zipfill(Z, n))
     zipeof(Z);
   else
@@ -598,13 +607,87 @@ zipfile(ZIP)
 }
 
 static void
-ziparch(ZIP)
+zipdir(ZIP)
 {
-  NOTYET;
+  uint32_t	sig, crc, len, real, attre, offs;
+  uint16_t	made, minv, flag, meth, time, date, name, extra, comt, disk, attri;
+
+  if (!zipfill(Z, 46))
+    return zipeof(Z);
+
+  zipart(Z, ZIP_DIR);
+
+  sig	= zipget32(Z);
+  made	= zipget16(Z);
+  minv	= zipget16(Z);
+  flag	= zipget16(Z);
+  meth	= zipget16(Z);
+  time	= zipget16(Z);
+  date	= zipget16(Z);
+  crc	= zipget32(Z);
+  len	= zipget32(Z);
+  real	= zipget32(Z);
+  name	= zipget16(Z);
+  extra	= zipget16(Z);
+  comt	= zipget16(Z);
+  disk	= zipget16(Z);
+  attri	= zipget16(Z);
+  attre	= zipget32(Z);
+  offs	= zipget32(Z);
+
+  out(Z, Z->current, ": sig",		"%08lx", (unsigned long)sig);
+  out(Z, Z->current, ": made",		"%d (%s)", made, Z_ver(made));
+  out(Z, Z->current, ": minver",	"%d (%s)", minv, Z_ver(minv));
+  out(Z, Z->current, ": flag",		"0x%04x", flag);
+  out(Z, Z->current, ": meth",		"0x%04x (%s)", meth, Z_meth(meth));
+  out(Z, Z->current, ": date/time",	"%04x %04x", date, time);
+  out(Z, Z->current, ": crc32",		"0x%08x", (unsigned long)crc);
+  out(Z, Z->current, ": compressed",	"%lu (0x%08lx)", (unsigned long)len, (unsigned long) len);
+  out(Z, Z->current, ": uncompressed",	"%lu (0x%08lx)", (unsigned long)real, (unsigned long)real);
+  out(Z, Z->current, ": name-len",	"%d", name);
+  out(Z, Z->current, ": extra-len",	"%d", extra);
+  out(Z, Z->current, ": comment-len",	"%d", comt);
+  out(Z, Z->current, ": disk",		"%d", disk);
+  out(Z, Z->current, ": attribute",	"%x", attri);
+  out(Z, Z->current, ": ext-attr",	"%lx", (unsigned long)attre);
+  out(Z, Z->current, ": data-offset",	"0x%08lx (%ld)", (unsigned long)offs, (unsigned long)offs);
+
+  ziphex(Z, ZIP_NAME, name);
+  if (extra)
+    zipextra(Z, extra);
+  ziphex(Z, ZIP_COMMENT, comt);
 }
 
 static void
-zipdir(ZIP)
+zipend(ZIP)
+{
+  unsigned long	tmp32;
+  Zoff		comt;
+
+  if (!zipfill(Z, 22))
+    return zipeof(Z);
+
+  zipart(Z, ZIP_END);
+
+  out(Z, Z->current, ": sig",		"%08lx", (unsigned long)zipget32(Z));
+  out(Z, Z->current, ": disk-number",	"%d", zipget16(Z));
+  out(Z, Z->current, ": start-disk",	"%d", zipget16(Z));
+  out(Z, Z->current, ": entries-here",	"%d", zipget16(Z));
+  out(Z, Z->current, ": entries-total",	"%d", zipget16(Z));
+  tmp32	= zipget32(Z);
+  out(Z, Z->current, ": dirsize",	"%lu (0x%08lx)", tmp32, tmp32);
+  out(Z, Z->current, ": dir-offset",	"0x%08lx (%lu)", tmp32, tmp32);
+  comt	= zipget16(Z);
+  out(Z, Z->current, ": comment-len",	"%d", comt);
+
+  ziphex(Z, ZIP_COMMENT, comt);
+
+  while (zipfill(Z, 1))
+    zipgarbage(Z, Z_len);
+}
+
+static void
+ziparch(ZIP)
 {
   NOTYET;
 }
@@ -623,12 +706,6 @@ zip64end(ZIP)
 
 static void
 zip64loc(ZIP)
-{
-  NOTYET;
-}
-
-static void
-zipend(ZIP)
 {
   NOTYET;
 }
