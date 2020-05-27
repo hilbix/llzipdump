@@ -12,7 +12,8 @@
 #define	D(...)
 #endif
 
-#define	ZIP	struct zipdump *Z
+#define	ZIP		struct zipdump *Z
+#define	HEXWIDTH	16
 
 enum zipartype
   {
@@ -41,6 +42,10 @@ typedef struct zipart
     unsigned		nr;
     unsigned long long	start;
     unsigned long long	len;
+    int			gather;
+    unsigned long long	gatherpos;
+    unsigned		gatherlen;
+    unsigned char	gatherbuf[HEXWIDTH];
   } *ZIPART;
 
 typedef	uint32_t	Zoff;
@@ -88,6 +93,16 @@ alloc(void *ptr, size_t len)
   ptr	= realloc(ptr, len);
   if (!ptr)
     OOPS("out of memory");
+  return ptr;
+}
+
+static void *
+alloc0(size_t len)
+{
+  void	*ptr;
+
+  ptr	= alloc(NULL, len);
+  memset(ptr, 0, len);
   return ptr;
 }
 
@@ -275,14 +290,65 @@ out(ZIP, ZIPART p, const char *s, const char *d, ...)
 }
 
 static void
+hexdump(ZIP, unsigned long long off, const unsigned char *ptr, int i)
+{
+  int	j;
+
+  FATAL(i>HEXWIDTH);
+
+  send(Z, ":%08llx:", off);
+  for (j=0; j<i; j++)
+    send(Z, " %02x", ptr[j]);
+  while (++j<=HEXWIDTH)
+    send(Z, "   ");
+  send(Z, "  ! ");
+  for (j=0; j<i; j++)
+    send(Z, "%c", ptr[j]>=32 && ptr[j]<127 ? ptr[j] : '.');
+  send(Z, "\n");
+}
+
+static void
+zipgather(ZIP)
+{
+  if (!Z->current->gather || !Z->current->gatherlen)
+    return;
+  hexdump(Z, Z->current->gatherpos, Z->current->gatherbuf, Z->current->gatherlen);
+  Z->current->gatherlen	= 0;
+}
+
+static void
 zipok(ZIP, Zoff n)
 {
   FATAL(!Z->current);
   FATAL(Z->current->start + Z->current->len != Z->offset);
-  Z->offset	+= n;
-  Z->pos	+= n;
-  FATAL(Z->pos > Z->fill);
+
+  if (Z->current->gather)
+    while (n)
+      {
+        int max;
+
+        if (Z->current->gatherlen >= sizeof Z->current->gatherbuf ||
+            (Z->current->gatherlen &&
+             Z->current->gatherpos + Z->current->gatherlen != Z->offset))
+          zipgather(Z);
+        if (!Z->current->gatherlen)
+          Z->current->gatherpos	= Z->offset;
+        FATAL(Z->current->gatherlen<0 || Z->current->gatherlen>=sizeof Z->current->gatherbuf);
+        max	= sizeof Z->current->gatherbuf - Z->current->gatherlen;
+        if (n<max)
+          max	= n;
+        FATAL(max<=0 || max>sizeof Z->current->gatherbuf);
+        memcpy(Z->current->gatherbuf + Z->current->gatherlen, Z->buf + Z->pos, max);
+        Z->current->gatherlen	+= max;
+        Z->current->len		+= max;
+        Z->offset		+= max;
+        Z->pos			+= max;
+        n			-= max;
+      }
   Z->current->len	+= n;
+  Z->offset		+= n;
+  Z->pos		+= n;
+  FATAL(Z->pos > Z->fill);
 }
 
 static int
@@ -330,13 +396,13 @@ zipart(ZIP, enum zipartype type)
       if (Z->current->type == type &&
           Z->current->start + Z->current->len == Z->offset)
         return;
+      zipgather(Z);
       free(Z->current);
     }
-  Z->current		= alloc(NULL, sizeof *Z->current);
+  Z->current		= alloc0(sizeof *Z->current);
   Z->current->nr	= ++Z->nr;
   Z->current->type	= type;
   Z->current->start	= Z->offset;
-  Z->current->len	= 0;
   out(Z, Z->current, NULL, "%s", Z_partype(type));
   out(Z, Z->current, ": offset", "0x%llx (%llu)", Z->offset, Z->offset);
 }
@@ -345,7 +411,7 @@ static void
 zipgarbage(ZIP, int nr)
 {
   zipart(Z, ZIP_GARBAGE);
-  Z->current->len	+= nr;
+  Z->current->gather	= 1;
   zipok(Z, nr);
 }
 
@@ -366,7 +432,9 @@ zipget(ZIP, int n)
   return ptr;
 }
 
+#if 0
 static uint32_t zipeek16(ZIP)	{ return Z_16(zipeek(Z, 2)); }
+#endif
 static uint32_t zipget16(ZIP)	{ return Z_16(zipget(Z, 2)); }
 static uint32_t zipeek32(ZIP)	{ return Z_32(zipeek(Z, 4)); }
 static uint32_t zipget32(ZIP)	{ return Z_32(zipget(Z, 4)); }
@@ -378,21 +446,13 @@ ziphexdump(ZIP, enum zipartype type, Zoff n)
   zipart(Z, type);
   while (n)
     {
-      const unsigned char	*ptr;
-      int			i, j;
+      int	i;
 
-      send(Z, ":%08llx:", (unsigned long long)Z->offset);
-      i		= n<16 ? n : 16;
+      i	= HEXWIDTH;
+      if (n<i)
+        i	= n;
       n		-= i;
-      ptr	= zipget(Z, i);
-      for (j=0; j<i; j++)
-        send(Z, " %02x", ptr[j]);
-      while (++j<=16)
-        send(Z, "   ");
-      send(Z, "  ! ");
-      for (j=0; j<i; j++)
-        send(Z, "%c", ptr[j]>=32 && ptr[j]<127 ? ptr[j] : '.');
-      send(Z, "\n");
+      hexdump(Z, Z->offset, zipget(Z, i), i);
     }
 }
 
@@ -470,7 +530,7 @@ zipdesc(ZIP, uint32_t crc1, uint32_t len1, uint32_t real1)
 
   zipart(Z, ZIP_DESC);
   sig2	= zipget32(Z);
-  crc2	= sig2 == 0x08074b50 ? zipget32(Z) : crc2;	/* WTF?	*/
+  crc2	= sig2 == 0x08074b50 ? zipget32(Z) : sig2;	/* WTF?	*/
   len2	= zipget32(Z);
   real2	= zipget32(Z);
   out(Z, Z->current, ": sig",		"%08lx", (unsigned long)sig2);
@@ -497,7 +557,7 @@ zipdesc(ZIP, uint32_t crc1, uint32_t len1, uint32_t real1)
 static void
 zipfile(ZIP)
 {
-  uint32_t	sig1, crc1, len1, real1, sig2, crc2, len2, real2;
+  uint32_t	sig1, crc1, len1, real1;
   uint16_t	ver, flag, meth, time, date, name, extra;
 
   if (!zipfill(Z, 30))
@@ -538,6 +598,42 @@ zipfile(ZIP)
 }
 
 static void
+ziparch(ZIP)
+{
+  NOTYET;
+}
+
+static void
+zipdir(ZIP)
+{
+  NOTYET;
+}
+
+static void
+zipsig(ZIP)
+{
+  NOTYET;
+}
+
+static void
+zip64end(ZIP)
+{
+  NOTYET;
+}
+
+static void
+zip64loc(ZIP)
+{
+  NOTYET;
+}
+
+static void
+zipend(ZIP)
+{
+  NOTYET;
+}
+
+static void
 zipdump(ZIP)
 {
   int	had;
@@ -547,13 +643,15 @@ zipdump(ZIP)
       uint32_t	h;
 
       h	= zipeek32(Z);
-      if (h == 0x04034b50)
-        zipfile(Z);
+      if (h == 0x04034b50)	zipfile(Z);
+      else if (h == 0x08064b50)	ziparch(Z);
+      else if (h == 0x02014b50)	zipdir(Z);
+      else if (h == 0x05054b50)	zipsig(Z);
+      else if (h == 0x06064b50)	zip64end(Z);
+      else if (h == 0x07064b50)	zip64loc(Z);
+      else if (h == 0x06054b50)	zipend(Z);
       else
-        {
-          out(Z, NULL, "id", "%08x", h);
-          FATAL(1);
-        }
+        zipgarbage(Z, 1);
     }
   if (Z->fill > Z->pos)
     zipgarbage(Z, Z_len);
