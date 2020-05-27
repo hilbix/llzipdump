@@ -20,7 +20,17 @@ Return code:
 
 	0 zip is clean
 	1 zip is not clean
-	else: unknown zip format
+	else: something is broken
+
+
+## TODO
+
+- CRC32 is not checked.  So currently you need other tools for this.
+
+- Add more ZIP variants.  If you find one which is not processed correctly,
+  pease open an issue on GH and do not forget to add a link to the ZIP file!
+  (Without a sample ZIP I certainly cannot fix it.)
+
 
 ## FAQ
 
