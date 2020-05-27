@@ -1,3 +1,9 @@
+> This is terribly incomplete
+>
+> However following is already useful:
+> - `./llzipdump ZIP >/dev/null; echo $?`
+> - `./llzipdump ZIP | less '+/ Garbage$'`
+
 # llzipdump
 
 LowLevel dump of ZIP files, when all other tools leave you completely in the dark.
@@ -12,15 +18,21 @@ LowLevel dump of ZIP files, when all other tools leave you completely in the dar
 Then:
 
 	llzipdump file.zip..
-	llzipdump file.zip - > clean.zip
 	llzipdump - < file.zip
-	llzipdump - - < dirty.zip > clean.zip
 
 Return code:
 
 	0 zip is clean
 	1 zip is not clean
 	else: something is broken
+
+In future I want the tool to be able to clean the ZIP file:
+
+	llzipdump -1 -- files.zip - > clean.zip
+	llzipdump -1 - < dirty.zip > clean.zip
+
+Please note that this then would wipe the APK signature,
+see https://source.android.com/security/apksigning
 
 
 ## TODO
