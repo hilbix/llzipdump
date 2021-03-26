@@ -453,13 +453,15 @@ ziphexdump(ZIP, enum zipartype type, Zoff n)
   zipart(Z, type);
   while (n)
     {
-      int	i;
+      unsigned long long	o;
+      int			i;
 
       i	= HEXWIDTH;
       if (n<i)
         i	= n;
       n		-= i;
-      hexdump(Z, Z->offset, zipget(Z, i), i);
+      o		= Z->offset;
+      hexdump(Z, o, zipget(Z, i), i);
     }
 }
 
