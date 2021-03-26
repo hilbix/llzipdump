@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "VERSION.h"
+
 #if 1
 #define	D(S,...)	do { fprintf(stderr, "[[%s:%d %s" S "]]\n", __FILE__, __LINE__, __func__, __VA_ARGS__); } while (0)
 #else
@@ -762,10 +764,15 @@ usage(const char *arg0)
   tmp	= strrchr(arg0, '/');
   if (tmp)
     arg0	= tmp+1;
-  fprintf(stderr, "# Usage: %s -- files..\n\toutput (possibly hidden) information about the given ZIP files\n", arg0);
 #if 0
-  fprintf(stderr, "# Usage: %s -N files.. > part\n\textract the Nth part (0 is what starts the file)\n", arg0);
+  fprintf(stderr, "Usage: %s -N files..\n"
 #endif
+  fprintf(stderr, "Usage v" VERSION " " __DATE__ ": %s -- files..\n"
+          "\toutput (possibly hidden) information about the given ZIP files\n"
+#if 0
+          "\t-N extracts the Nth part (0 is what starts the file)\n"
+#endif
+          , arg0);
   return 42;
 }
 
