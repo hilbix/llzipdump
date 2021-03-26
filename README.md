@@ -16,7 +16,7 @@ LowLevel dump of ZIP files, when all other tools leave you completely in the dar
 
 	git clone https://github.com/hilbix/llzipdump.git
 	cd llzipdump
-	make
+	make all
 	sudo make install
 
 Then:
