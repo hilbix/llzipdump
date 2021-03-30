@@ -1,3 +1,5 @@
+[![Build Status](https://api.cirrus-ci.com/github/hilbix/llzipdump.svg)](https://cirrus-ci.com/github/hilbix/llzipdump)
+
 > This is terribly incomplete for now
 >
 > However following is already useful on JARs and APKs:
