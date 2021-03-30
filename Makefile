@@ -13,7 +13,7 @@ all:	$(PROG)
 
 .PHONY:	install
 install:	$(PROG)
-	install -t '$(PREFIX)/bin' $<
+	install $? '$(PREFIX)/bin/'
 
 .PHONY:	debug
 debug:	all
