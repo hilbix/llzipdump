@@ -23,3 +23,7 @@ debug:	all
 clean:
 	rm -f $(PROG)
 
+.PHONY:	test
+test:	$(PROG)
+	./llzipdump; [ 42 = $$? ]
+
